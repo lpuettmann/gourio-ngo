@@ -72,7 +72,7 @@ ggplot(subset(df, (Date >= stDate) & (Date <= enDate)), aes(x = Date)) +
              size       = 1, 
              color      = "black",
              linetype   = "dotted") + 
-  labs(x        = paste("Days"),
+  labs(x        = "Days",
        y        = "Normalized values",
        title    = "Comparing inflation breakeven and stock market performance",
        subtitle = paste(stDate, "to", enDate, "(normalized to 2011-05-02)"),
