@@ -8,13 +8,12 @@ library(zoo)
 # Download the S&P 500 data
 sp500 <- read_csv("https://stooq.com/q/d/l/?s=^spx&i=d", col_types = 
                     cols(
-                    Date   = col_date(format = ""),
+                    Date   = col_date(format = "%Y-%m-%d"),
                     Open   = col_double(),
                     High   = col_double(),
                     Low    = col_double(),
                     Close  = col_double(),
-                    Volume = col_character() ) )  %>%
-  mutate(Date = as.Date(Date)) %>%
+                    Volume = col_double()))  %>%
   select(Date, sp500 = Close)
 
 # Get 10 year breakevens (nominal - indexed Treasury bond yields) from Fred
@@ -23,11 +22,9 @@ fred    <- FredR(api_key)
 
 fred$series.observations(series_id = "T10YIE") %>%
   select(Date = date, be = value) %>%
-  mutate(Date = as.Date(Date)) %>%
-  full_join(., sp500, by = "Date") %>%
-  as.tibble() -> df
-
-df$be[df$be == "."] <- NA # assign missing values
+  mutate(Date = as.Date(Date),
+         be = ifelse(be == ".", NA, as.numeric(be))) %>%
+  full_join(., sp500, by = "Date") -> df
 
 gr_back <- function(series, freq) {
   # Calculate backward-looking growth rate in percentage points.
@@ -45,7 +42,6 @@ gr_back <- function(series, freq) {
 # Delete missing values and calculate daily growth rates
 df <- df %>%
   na.omit() %>%
-  mutate(be       = as.numeric(be)) %>%
   mutate(sp500_gr = gr_back(sp500, 1),  
          be_gr    = gr_back(be, 1))
 
@@ -53,16 +49,16 @@ df <- df %>%
 
 # Normalize the series for comparison
 df <- df %>%
-  mutate(sp500_norm = sp500   / df$sp500[df$Date   == "2011-05-02"],
-         be_norm    = be      / df$be[df$Date      == "2011-05-02"])
+  mutate(sp500_norm = sp500 / df$sp500[df$Date   == "2011-05-02"],
+         be_norm    = be    / df$be[df$Date      == "2011-05-02"])
 
-stDate <- as.Date("2003-01-02")
-enDate <- as.Date("2017-06-29")
+stDate  <- as.Date("2003-01-02")
+enDate  <- as.Date("2017-06-29")
 stPaper <- as.Date("2009-07-01")
 enPaper <- as.Date("2013-05-31")
 
 ggplot(subset(df, (Date >= stDate) & (Date <= enDate)), aes(x = Date)) +
-  geom_line(aes(y = be_norm, color = "10-year inflation breakeven")) +
+  geom_line(aes(y = be_norm,    color = "10-year inflation breakeven")) +
   geom_line(aes(y = sp500_norm, color = "S&P 500")) +
   geom_vline(xintercept = as.numeric(stPaper), 
              size       = 1, 
@@ -76,6 +72,6 @@ ggplot(subset(df, (Date >= stDate) & (Date <= enDate)), aes(x = Date)) +
        y        = "Normalized values",
        title    = "Comparing inflation breakeven and stock market performance",
        subtitle = paste(stDate, "to", enDate, "(normalized to 2011-05-02)"),
-       caption  = paste("Vertical dotted lines are ", stPaper, " and ", 
-                        enPaper, ".", sep = "")) +
-  theme_minimal()
+       caption  = paste0("Vertical dotted lines are ", stPaper, " and ", 
+                        enPaper, ".")) +
+         theme_minimal()
